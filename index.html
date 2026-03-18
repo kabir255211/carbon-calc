@@ -1,0 +1,125 @@
+import streamlit as st
+import re
+import pandas as pd
+from streamlit_lottie import st_lottie
+import requests
+
+# -------------------------------
+# Page Configuration
+# -------------------------------
+st.set_page_config(
+    page_title="AI Carbon Calculator",
+    page_icon="🌱",
+    layout="centered"
+)
+
+# -------------------------------
+# Custom CSS for Olive Background
+# -------------------------------
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #808000; /* olive */
+        color: white;
+    }
+    .stButton>button {
+        background-color: #556B2F;
+        color: white;
+        border-radius: 8px;
+        padding: 0.5em 1em;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -------------------------------
+# Title and Description
+# -------------------------------
+st.title("🌱 AI Carbon Credit Calculator")
+st.write("Describe your activity and get CO2 emissions + carbon credits")
+
+# -------------------------------
+# Emission Dataset
+# -------------------------------
+data = {
+    "activity": ["car", "bus", "electricity", "lpg", "train"],
+    "co2_per_unit": [0.21, 0.10, 0.82, 2.98, 0.05]
+}
+df = pd.DataFrame(data)
+
+# -------------------------------
+# User Input
+# -------------------------------
+user_input = st.text_input(
+    "Enter your activity:",
+    placeholder="Example: I travelled 10 km by car"
+)
+
+# -------------------------------
+# Function to Calculate CO₂
+# -------------------------------
+def calculate_carbon(text):
+    text = text.lower()
+    number = re.findall(r'\d+', text)
+    if not number:
+        return "❌ Please enter a number (e.g., 10 km)"
+    value = int(number[0])
+
+    for activity in df["activity"]:
+        if activity in text:
+            factor = df[df["activity"] == activity]["co2_per_unit"].values[0]
+            co2 = value * factor
+            credits = co2 / 1000
+            return activity, value, co2, credits
+
+    return "❌ Activity not recognized"
+
+# -------------------------------
+# Lottie Animation Loader
+# -------------------------------
+def load_lottie_url(url):
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
+
+# Example animation URL
+lottie_eco = load_lottie_url("https://assets5.lottiefiles.com/packages/lf20_5ngs2ksb.json")
+
+# -------------------------------
+# Calculate Button Action
+# -------------------------------
+if st.button("Calculate 🌍"):
+    result = calculate_carbon(user_input)
+
+    if isinstance(result, str):
+        st.error(result)
+    else:
+        activity, value, co2, credits = result
+
+        st.success(f"✅ Activity Detected: {activity}")
+        st.write(f"📊 Input Value: {value}")
+
+        st.metric("🌫️ CO2 Emitted (kg)", f"{co2:.2f}")
+        st.metric("🌿 Carbon Credits", f"{credits:.4f}")
+
+        # Visualization
+        chart_data = pd.DataFrame({
+            "Type": ["CO2 Emission", "Carbon Credits"],
+            "Value": [co2, credits]
+        })
+        st.bar_chart(chart_data.set_index("Type"))
+
+        # Display Animation
+        if lottie_eco:
+            st_lottie(lottie_eco, speed=1, height=200, key="eco")
+
+# -------------------------------
+# Info Section
+# -------------------------------
+st.markdown("---")
+st.info("💡 1 Carbon Credit = 1000 kg CO2")
+st.write("Supported activities:")
+st.write(", ".join(df["activity"].tolist()))
